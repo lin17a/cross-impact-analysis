@@ -8,8 +8,8 @@ export function buildMatrix(nodes, edges) {
     const sourceIdx = factors.findIndex((f) => f.id === edge.source);
     const targetIdx = factors.findIndex((f) => f.id === edge.target);
     if (sourceIdx !== -1 && targetIdx !== -1) {
-      matrix[sourceIdx][targetIdx] = edge.data?.weight || 0;
-      timeframeMatrix[sourceIdx][targetIdx] = edge.data?.timeframe || 'short';
+      matrix[sourceIdx][targetIdx] = Math.abs(edge.data?.weight || 0);
+      timeframeMatrix[sourceIdx][targetIdx] = edge.data?.timeframe ?? null;
     }
   });
 

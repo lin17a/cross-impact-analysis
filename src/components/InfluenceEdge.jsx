@@ -1,28 +1,9 @@
 import { useState, useContext, useEffect, useRef } from 'react';
 import { getBezierPath, EdgeLabelRenderer, useReactFlow } from 'reactflow';
-import { AppContext } from '../App';
+import { AppContext, getTimeframeColor } from '../App';
+import { translations } from '../i18n';
 
-const WEIGHT_LABELS = {
-  '-3': 'Strong −',
-  '-2': 'Medium −',
-  '-1': 'Weak −',
-  '0': 'None',
-  '1': 'Weak +',
-  '2': 'Medium +',
-  '3': 'Strong +',
-};
-
-const TIMEFRAME_COLORS = {
-  short: '#3b82f6',
-  middle: '#f59e0b',
-  long: '#8b5cf6',
-};
-
-const TIMEFRAME_OPTIONS = [
-  { value: 'short', label: 'S', title: 'Short term' },
-  { value: 'middle', label: 'M', title: 'Middle term' },
-  { value: 'long', label: 'L', title: 'Long term' },
-];
+const HANDLE_OPTIONS = ['top', 'bottom', 'left', 'right'];
 
 export default function InfluenceEdge({
   id,
@@ -34,6 +15,8 @@ export default function InfluenceEdge({
   targetY,
   sourcePosition,
   targetPosition,
+  sourceHandleId,
+  targetHandleId,
   data,
   markerEnd,
 }) {
@@ -41,18 +24,26 @@ export default function InfluenceEdge({
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef({ startX: 0, startY: 0, startOffsetX: 0, startOffsetY: 0, moved: false });
   const popupRef = useRef(null);
-  const { edges, updateEdgeWeight, updateEdgeTimeframe, updateEdgeLabelOffset, invertEdge, deleteEdge } = useContext(AppContext);
+  const { edges, lang, updateEdgeWeight, updateEdgeDirection, updateEdgeTimeframe, updateEdgeLabelOffset, updateEdgeHandles, invertEdge, deleteEdge } = useContext(AppContext);
   const { getZoom } = useReactFlow();
 
-  const weight = data?.weight ?? 0;
-  const timeframe = data?.timeframe || 'short';
+  const t = translations[lang].edge;
+
+  const weight = data?.weight ?? 1;
+  const direction = data?.direction ?? null;
+  const timeframe = data?.timeframe ?? null;
   const offsetX = data?.labelOffsetX ?? 0;
   const offsetY = data?.labelOffsetY ?? 0;
-  const color = TIMEFRAME_COLORS[timeframe] || TIMEFRAME_COLORS.short;
-  const strokeWidth = Math.max(1.5, Math.abs(weight) * 1.5);
+  const color = getTimeframeColor(timeframe);
+  const strokeWidth = Math.max(1.5, weight * 1.5);
 
   // Check if reverse edge exists (for graying out invert button)
   const reverseExists = edges.some((e) => e.source === target && e.target === source);
+
+  // Build badge text
+  let badgeText = String(weight);
+  if (direction === '+') badgeText = `+${weight}`;
+  else if (direction === '-') badgeText = `−${weight}`;
 
   // Default label position from bezier
   const [defaultPath, defaultLabelX, defaultLabelY] = getBezierPath({
@@ -134,6 +125,8 @@ export default function InfluenceEdge({
     };
   }, [dragging, id, getZoom, updateEdgeLabelOffset]);
 
+  const handleLabels = { top: t.top, bottom: t.bottom, left: t.left, right: t.right };
+
   return (
     <>
       <path
@@ -160,71 +153,135 @@ export default function InfluenceEdge({
           {editing ? (
             <div
               ref={popupRef}
-              className="bg-white rounded-lg shadow-lg p-2 border border-gray-200 flex flex-col gap-1.5 min-w-[140px]"
+              className="bg-white rounded-lg shadow-lg p-2.5 border border-gray-200 flex flex-col gap-2 min-w-[160px]"
             >
-              <select
-                value={weight}
-                onChange={(e) => {
-                  updateEdgeWeight(id, parseInt(e.target.value));
-                }}
-                autoFocus
-                className="px-1 py-0.5 text-xs rounded border border-gray-300 bg-white outline-none w-full"
-              >
-                {[-3, -2, -1, 0, 1, 2, 3].map((w) => (
-                  <option key={w} value={w}>
-                    {w > 0 ? `+${w}` : w} — {WEIGHT_LABELS[String(w)]}
-                  </option>
-                ))}
-              </select>
-              <div className="flex gap-1">
-                {TIMEFRAME_OPTIONS.map((tf) => (
-                  <button
-                    key={tf.value}
-                    onClick={() => updateEdgeTimeframe(id, tf.value)}
-                    title={tf.title}
-                    className={`flex-1 px-1 py-0.5 text-xs rounded font-semibold transition-colors ${
-                      timeframe === tf.value
-                        ? 'text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                    style={timeframe === tf.value ? { backgroundColor: TIMEFRAME_COLORS[tf.value] } : undefined}
-                  >
-                    {tf.title}
-                  </button>
-                ))}
+              {/* Strength */}
+              <div>
+                <div className="text-[10px] font-medium text-gray-500 mb-1">{t.strength}</div>
+                <div className="flex gap-1">
+                  {[1, 2, 3].map((w) => (
+                    <button
+                      key={w}
+                      onClick={() => updateEdgeWeight(id, w)}
+                      className={`flex-1 px-1 py-0.5 text-xs rounded font-semibold transition-colors ${
+                        weight === w
+                          ? 'bg-gray-800 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {w} — {t[`strength${w}`]}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <button
-                onClick={() => {
-                  if (reverseExists) return;
-                  invertEdge(id);
-                  setEditing(false);
-                }}
-                disabled={reverseExists}
-                className={`px-1 py-0.5 text-xs rounded border ${
-                  reverseExists
-                    ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-700'
-                }`}
-                title={reverseExists ? 'Reverse connection already exists' : 'Invert arrow direction'}
-              >
-                ⇄ Invert direction
-              </button>
-              <button
-                onClick={() => deleteEdge(id)}
-                className="px-1 py-0.5 text-xs rounded border border-red-200 bg-red-50 hover:bg-red-100 text-red-600"
-                title="Delete this connection"
-              >
-                🗑 Delete
-              </button>
+              {/* Direction */}
+              <div>
+                <div className="text-[10px] font-medium text-gray-500 mb-1">{t.direction}</div>
+                <div className="flex gap-1">
+                  {[
+                    { value: null, label: t.dirNone },
+                    { value: '+', label: t.dirSame },
+                    { value: '-', label: t.dirOpposite },
+                  ].map((d) => (
+                    <button
+                      key={String(d.value)}
+                      onClick={() => updateEdgeDirection(id, d.value)}
+                      className={`flex-1 px-1 py-0.5 text-xs rounded font-semibold transition-colors ${
+                        direction === d.value
+                          ? 'bg-gray-800 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Timeframe */}
+              <div>
+                <div className="text-[10px] font-medium text-gray-500 mb-1">{t.timeframe}</div>
+                <div className="flex gap-1">
+                  {[
+                    { value: null, label: t.tfNone, color: null },
+                    { value: 'short', label: t.tfShort, color: '#ef4444' },
+                    { value: 'middle', label: t.tfMiddle, color: '#0ea5e9' },
+                    { value: 'long', label: t.tfLong, color: '#22c55e' },
+                  ].map((tf) => (
+                    <button
+                      key={String(tf.value)}
+                      onClick={() => updateEdgeTimeframe(id, tf.value)}
+                      className={`flex-1 px-1 py-0.5 text-xs rounded font-semibold transition-colors ${
+                        timeframe === tf.value
+                          ? 'text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                      style={timeframe === tf.value ? { backgroundColor: tf.color || '#6b7280' } : undefined}
+                    >
+                      {tf.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Dock points */}
+              <div>
+                <div className="text-[10px] font-medium text-gray-500 mb-1">{t.dockPoints}</div>
+                <div className="flex gap-2 items-center">
+                  <label className="text-xs text-gray-500">{t.from}</label>
+                  <select
+                    value={sourceHandleId || 'bottom'}
+                    onChange={(e) => updateEdgeHandles(id, e.target.value, targetHandleId || 'top')}
+                    className="flex-1 px-1 py-0.5 text-xs rounded border border-gray-300 bg-white outline-none"
+                  >
+                    {HANDLE_OPTIONS.map((h) => (
+                      <option key={h} value={h}>{handleLabels[h]}</option>
+                    ))}
+                  </select>
+                  <label className="text-xs text-gray-500">{t.to}</label>
+                  <select
+                    value={targetHandleId || 'top'}
+                    onChange={(e) => updateEdgeHandles(id, sourceHandleId || 'bottom', e.target.value)}
+                    className="flex-1 px-1 py-0.5 text-xs rounded border border-gray-300 bg-white outline-none"
+                  >
+                    {HANDLE_OPTIONS.map((h) => (
+                      <option key={h} value={h}>{handleLabels[h]}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              {/* Actions */}
+              <div className="flex flex-col gap-1 pt-1 border-t border-gray-100">
+                <button
+                  onClick={() => {
+                    if (reverseExists) return;
+                    invertEdge(id);
+                    setEditing(false);
+                  }}
+                  disabled={reverseExists}
+                  className={`px-1 py-0.5 text-xs rounded border ${
+                    reverseExists
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-700'
+                  }`}
+                  title={reverseExists ? t.reverseExists : ''}
+                >
+                  {t.invert}
+                </button>
+                <button
+                  onClick={() => deleteEdge(id)}
+                  className="px-1 py-0.5 text-xs rounded border border-red-200 bg-red-50 hover:bg-red-100 text-red-600"
+                >
+                  {t.delete}
+                </button>
+              </div>
             </div>
           ) : (
             <div
               onMouseDown={handleMouseDown}
               className={`px-2 py-0.5 rounded-full text-xs font-bold text-white shadow-sm hover:shadow-md hover:scale-110 transition-all ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
               style={{ backgroundColor: color }}
-              title="Click to edit · Drag to reposition"
+              title={t.clickToEdit}
             >
-              {weight > 0 ? `+${weight}` : weight}
+              {badgeText}
             </div>
           )}
         </div>

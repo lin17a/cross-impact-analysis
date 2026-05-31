@@ -10,6 +10,7 @@ import {
   Cell,
   LabelList,
 } from 'recharts';
+import { translations } from '../i18n';
 
 const COLORS = {
   Active: '#3b82f6',
@@ -18,44 +19,37 @@ const COLORS = {
   Buffering: '#6b7280',
 };
 
-const DESCRIPTIONS = {
-  Active: 'Strongly influences others, weakly influenced itself',
-  Reactive: 'Weakly influences others, strongly influenced itself',
-  Critical: 'Strongly influences and is strongly influenced — leverage points',
-  Buffering: 'Neither strongly influences nor is strongly influenced',
-};
-
-function CustomTooltip({ active, payload }) {
+function CustomTooltip({ active, payload, t }) {
   if (!active || !payload?.length) return null;
   const { name, x, y, classification } = payload[0].payload;
   return (
     <div className="bg-white shadow-lg border border-gray-200 rounded-lg p-3 text-sm">
       <p className="font-semibold text-gray-800">{name}</p>
-      <p className="text-gray-600">Active Sum: {x}</p>
-      <p className="text-gray-600">Passive Sum: {y}</p>
+      <p className="text-gray-600">{t.activeSum}: {x}</p>
+      <p className="text-gray-600">{t.passiveSum}: {y}</p>
       <p className="mt-1">
         <span
           className="inline-block px-2 py-0.5 rounded-full text-xs font-medium text-white"
           style={{ backgroundColor: COLORS[classification] }}
         >
-          {classification}
+          {t[classification]}
         </span>
       </p>
     </div>
   );
 }
 
-export default function QuadrantChart({ analysisData }) {
+export default function QuadrantChart({ analysisData, lang }) {
+  const t = translations[lang].quadrant;
   const { analysis, meanAS, meanPS } = analysisData;
 
   if (analysis.length === 0) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400">
         <div className="text-center">
-          <p className="text-lg mb-2">No data yet</p>
+          <p className="text-lg mb-2">{t.noData}</p>
           <p className="text-sm">
-            Add factors and connections on the Canvas tab to see the quadrant
-            analysis.
+            {t.noDataDesc}
           </p>
         </div>
       </div>
@@ -78,12 +72,10 @@ export default function QuadrantChart({ analysisData }) {
   return (
     <div className="p-6 overflow-auto h-full">
       <h2 className="text-xl font-semibold text-gray-800 mb-1">
-        Vester Quadrant Analysis
+        {t.title}
       </h2>
       <p className="text-sm text-gray-500 mb-6">
-        Each factor is plotted by its Active Sum (total outgoing influence) and
-        Passive Sum (total incoming influence). Dashed lines at the mean values
-        divide factors into four system roles.
+        {t.description}
       </p>
 
       {/* Chart */}
@@ -96,7 +88,7 @@ export default function QuadrantChart({ analysisData }) {
               dataKey="x"
               domain={[0, domainMax]}
               label={{
-                value: 'Active Sum (AS) →',
+                value: t.xAxisLabel,
                 position: 'bottom',
                 offset: 15,
                 style: { fill: '#6b7280', fontSize: 13 },
@@ -108,7 +100,7 @@ export default function QuadrantChart({ analysisData }) {
               dataKey="y"
               domain={[0, domainMax]}
               label={{
-                value: '← Passive Sum (PS)',
+                value: t.yAxisLabel,
                 angle: -90,
                 position: 'left',
                 offset: 15,
@@ -122,7 +114,7 @@ export default function QuadrantChart({ analysisData }) {
               strokeDasharray="8 4"
               strokeWidth={1.5}
               label={{
-                value: `Mean AS: ${meanAS.toFixed(1)}`,
+                value: `${t.meanAS}: ${meanAS.toFixed(1)}`,
                 position: 'top',
                 style: { fill: '#64748b', fontSize: 11 },
               }}
@@ -133,12 +125,12 @@ export default function QuadrantChart({ analysisData }) {
               strokeDasharray="8 4"
               strokeWidth={1.5}
               label={{
-                value: `Mean PS: ${meanPS.toFixed(1)}`,
+                value: `${t.meanPS}: ${meanPS.toFixed(1)}`,
                 position: 'right',
                 style: { fill: '#64748b', fontSize: 11 },
               }}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip t={t} />} />
             <Scatter data={chartData}>
               {chartData.map((entry, i) => (
                 <Cell
@@ -171,8 +163,8 @@ export default function QuadrantChart({ analysisData }) {
               style={{ backgroundColor: color }}
             />
             <div>
-              <span className="text-sm font-medium text-gray-800">{cls}</span>
-              <p className="text-xs text-gray-500">{DESCRIPTIONS[cls]}</p>
+              <span className="text-sm font-medium text-gray-800">{t[cls]}</span>
+              <p className="text-xs text-gray-500">{t[`${cls}Desc`]}</p>
             </div>
           </div>
         ))}
@@ -184,13 +176,13 @@ export default function QuadrantChart({ analysisData }) {
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
               <th className="text-left px-4 py-3 font-semibold text-gray-700">
-                Factor
+                {t.factor}
               </th>
               <th className="text-right px-4 py-3 font-semibold text-gray-700">
-                Active Sum
+                {t.activeSum}
               </th>
               <th className="text-right px-4 py-3 font-semibold text-gray-700">
-                Passive Sum
+                {t.passiveSum}
               </th>
               <th className="text-right px-4 py-3 font-semibold text-gray-700">
                 Q = AS × PS
@@ -199,7 +191,7 @@ export default function QuadrantChart({ analysisData }) {
                 P = AS / PS
               </th>
               <th className="text-left px-4 py-3 font-semibold text-gray-700">
-                Role
+                {t.role}
               </th>
             </tr>
           </thead>
@@ -229,7 +221,7 @@ export default function QuadrantChart({ analysisData }) {
                     className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium text-white"
                     style={{ backgroundColor: COLORS[a.classification] }}
                   >
-                    {a.classification}
+                    {t[a.classification]}
                   </span>
                 </td>
               </tr>

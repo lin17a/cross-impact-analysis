@@ -5,15 +5,16 @@ import MatrixView from './components/MatrixView';
 import QuadrantChart from './components/QuadrantChart';
 import { buildMatrix, calculateFactorAnalysis } from './utils/matrixUtils';
 import { exportToExcel } from './utils/excelExport';
+import { translations } from './i18n';
 
 export const AppContext = createContext();
 
-function getTimeframeColor(timeframe) {
+export function getTimeframeColor(timeframe) {
   switch (timeframe) {
-    case 'short': return '#3b82f6';
-    case 'middle': return '#f59e0b';
-    case 'long': return '#8b5cf6';
-    default: return '#3b82f6';
+    case 'short': return '#ef4444';
+    case 'middle': return '#0ea5e9';
+    case 'long': return '#22c55e';
+    default: return '#6b7280';
   }
 }
 
@@ -23,6 +24,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('canvas');
   const [showMenu, setShowMenu] = useState(false);
   const [toast, setToast] = useState(null);
+  const [lang, setLang] = useState('en');
+
+  const t = translations[lang];
 
   const showToast = useCallback((message) => {
     setToast(message);
@@ -46,7 +50,7 @@ export default function App() {
         (e) => e.source === connection.source && e.target === connection.target
       );
       if (exists) {
-        setTimeout(() => showToast('Connection already exists between these factors'), 0);
+        setTimeout(() => showToast(translations[lang].app.connectionExists), 0);
         return eds;
       }
       const newEdge = {
@@ -56,12 +60,12 @@ export default function App() {
         sourceHandle: connection.sourceHandle,
         targetHandle: connection.targetHandle,
         type: 'influence',
-        data: { weight: 1, timeframe: 'short' },
-        markerEnd: { type: MarkerType.ArrowClosed, color: getTimeframeColor('short') },
+        data: { weight: 1, direction: null, timeframe: null },
+        markerEnd: { type: MarkerType.ArrowClosed, color: getTimeframeColor(null) },
       };
       return [...eds, newEdge];
     });
-  }, [showToast]);
+  }, [showToast, lang]);
 
   const addNode = useCallback(() => {
     setNodes((nds) => {
@@ -70,17 +74,18 @@ export default function App() {
         return isNaN(num) ? max : Math.max(max, num);
       }, 0);
       const newId = maxId + 1;
+      const label = `${translations[lang].app.newFactor} ${newId}`;
       return [
         ...nds,
         {
           id: `factor-${newId}`,
           type: 'factor',
           position: { x: 150 + Math.random() * 400, y: 100 + Math.random() * 300 },
-          data: { label: `Factor ${newId}` },
+          data: { label },
         },
       ];
     });
-  }, []);
+  }, [lang]);
 
   const updateNodeLabel = useCallback((nodeId, newLabel) => {
     setNodes((nds) =>
@@ -97,7 +102,7 @@ export default function App() {
           ? {
               ...e,
               data: { ...e.data, weight: newWeight },
-              markerEnd: { type: MarkerType.ArrowClosed, color: getTimeframeColor(e.data?.timeframe || 'short') },
+              markerEnd: { type: MarkerType.ArrowClosed, color: getTimeframeColor(e.data?.timeframe ?? null) },
             }
           : e
       )
@@ -113,6 +118,26 @@ export default function App() {
               data: { ...e.data, timeframe: newTimeframe },
               markerEnd: { type: MarkerType.ArrowClosed, color: getTimeframeColor(newTimeframe) },
             }
+          : e
+      )
+    );
+  }, []);
+
+  const updateEdgeDirection = useCallback((edgeId, newDirection) => {
+    setEdges((eds) =>
+      eds.map((e) =>
+        e.id === edgeId
+          ? { ...e, data: { ...e.data, direction: newDirection } }
+          : e
+      )
+    );
+  }, []);
+
+  const updateEdgeHandles = useCallback((edgeId, sourceHandle, targetHandle) => {
+    setEdges((eds) =>
+      eds.map((e) =>
+        e.id === edgeId
+          ? { ...e, sourceHandle, targetHandle }
           : e
       )
     );
@@ -159,7 +184,7 @@ export default function App() {
   }, []);
 
   const clearAll = useCallback(() => {
-    if (!confirm('Clear all factors and connections?')) return;
+    if (!confirm(t.app.clearConfirm)) return;
     setNodes([]);
     setEdges([]);
   }, []);
@@ -222,12 +247,12 @@ export default function App() {
     exportToExcel(matrixData, analysisData);
   }, [matrixData, analysisData]);
 
-  const contextValue = { edges, updateEdgeWeight, updateEdgeTimeframe, updateEdgeLabelOffset, updateNodeLabel, deleteNode, deleteEdge, invertEdge };
+  const contextValue = { edges, lang, updateEdgeWeight, updateEdgeDirection, updateEdgeTimeframe, updateEdgeLabelOffset, updateEdgeHandles, updateNodeLabel, deleteNode, deleteEdge, invertEdge };
 
   const tabs = [
-    { id: 'canvas', label: '🎨 Canvas' },
-    { id: 'matrix', label: '📊 Matrix' },
-    { id: 'quadrant', label: '📈 Quadrant Analysis' },
+    { id: 'canvas', label: t.app.tabCanvas },
+    { id: 'matrix', label: t.app.tabMatrix },
+    { id: 'quadrant', label: t.app.tabQuadrant },
   ];
 
   return (
@@ -243,7 +268,7 @@ export default function App() {
         <header className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-6">
             <h1 className="text-lg font-semibold text-gray-800">
-              Cross-Impact Analysis
+              {t.app.title}
             </h1>
             <nav className="flex gap-1">
               {tabs.map((tab) => (
@@ -262,25 +287,33 @@ export default function App() {
             </nav>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={addNode}
-              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            >
-              + Add Factor
-            </button>
+            {activeTab === 'canvas' && (
+              <button
+                onClick={addNode}
+                className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                {t.app.addFactor}
+              </button>
+            )}
             <button
               onClick={handleExportExcel}
               disabled={nodes.length === 0}
               className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              Export Excel
+              {t.app.exportExcel}
+            </button>
+            <button
+              onClick={() => setLang((l) => (l === 'en' ? 'de' : 'en'))}
+              className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors font-medium"
+            >
+              {lang === 'en' ? 'DE' : 'EN'}
             </button>
             <div className="relative">
               <button
                 onClick={() => setShowMenu(!showMenu)}
                 className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
               >
-                ⋮ More
+                {t.app.more}
               </button>
               {showMenu && (
                 <>
@@ -293,26 +326,26 @@ export default function App() {
                       onClick={saveToLocalStorage}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
-                      💾 Save to Browser
+                      {t.app.saveBrowser}
                     </button>
                     <button
                       onClick={loadFromLocalStorage}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
-                      📂 Load from Browser
+                      {t.app.loadBrowser}
                     </button>
                     <hr className="my-1 border-gray-200" />
                     <button
                       onClick={exportJSON}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
-                      ⬇️ Export JSON
+                      {t.app.exportJSON}
                     </button>
                     <button
                       onClick={importJSON}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
-                      ⬆️ Import JSON
+                      {t.app.importJSON}
                     </button>
                     <hr className="my-1 border-gray-200" />
                     <button
@@ -322,7 +355,7 @@ export default function App() {
                       }}
                       className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                     >
-                      🗑️ Clear All
+                      {t.app.clearAll}
                     </button>
                   </div>
                 </>
@@ -344,9 +377,9 @@ export default function App() {
               />
             </ReactFlowProvider>
           )}
-          {activeTab === 'matrix' && <MatrixView matrixData={matrixData} />}
+          {activeTab === 'matrix' && <MatrixView matrixData={matrixData} lang={lang} />}
           {activeTab === 'quadrant' && (
-            <QuadrantChart analysisData={analysisData} />
+            <QuadrantChart analysisData={analysisData} lang={lang} />
           )}
         </main>
       </div>
